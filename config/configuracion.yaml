@@ -1,0 +1,35 @@
+# Configuración general del sistema. Las variables de entorno SISMOS_* tienen prioridad sobre este fichero.
+
+ingesta:
+  magnitud_minima: 2.5          # magnitud mínima que se ingiere de cada fuente
+  anios_historico: 30           # ventana del backfill histórico
+  intervalo_minutos: 5          # frecuencia del sondeo incremental
+  solapamiento_horas: 48        # reconsulta para captar revisiones de eventos recientes
+  reintentos: 4
+  pausa_base_segundos: 2
+  timeout_segundos: 60
+
+kafka:
+  bootstrap_servers: localhost:9092
+  topic: sismos.raw
+
+mongo:
+  uri: mongodb://localhost:27017
+  base_datos: sismos
+
+rutas:
+  datos: data
+  bronze: data/lake/bronze      # eventos crudos recibidos de Kafka (JSON)
+  silver: data/lake/silver      # eventos limpios, deduplicados y clasificados (Parquet)
+  gold: data/lake/gold          # agregados para análisis (Parquet)
+  rechazados: data/lake/rechazados
+  checkpoints: data/checkpoints
+
+procesamiento:
+  ventana_cruce_segundos: 60     # tolerancia temporal para considerar el mismo sismo en dos fuentes
+  distancia_cruce_km: 100        # tolerancia espacial para el mismo sismo en dos fuentes
+  diferencia_magnitud_max: 1.0   # tolerancia de magnitud entre fuentes
+  umbral_magnitud: 6.0           # eventos que se marcan como relevantes
+  profundidad_superficial_km: 70
+  profundidad_intermedia_km: 300
+  ventana_alertas_horas: 24      # ventana para el análisis de eventos recientes

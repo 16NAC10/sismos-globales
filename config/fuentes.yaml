@@ -1,0 +1,24 @@
+# Fuentes de datos sísmicos. Todas exponen el servicio FDSN Event salvo USGS (GeoJSON, con nivel de alerta).
+# prioridad: menor número = fuente preferente cuando un mismo sismo aparece en varias fuentes.
+
+fuentes:
+  - nombre: USGS
+    formato: usgs_geojson
+    url: https://earthquake.usgs.gov/fdsnws/event/1/query
+    prioridad: 1
+    limite_por_consulta: 20000
+  - nombre: EMSC
+    formato: fdsn_texto
+    url: https://www.seismicportal.eu/fdsnws/event/1/query
+    prioridad: 2
+    limite_por_consulta: 20000
+  - nombre: GFZ
+    formato: fdsn_texto
+    url: https://geofon.gfz-potsdam.de/fdsnws/event/1/query
+    prioridad: 3
+    limite_por_consulta: 20000
+  - nombre: INGV
+    formato: fdsn_texto
+    url: https://webservices.ingv.it/fdsnws/event/1/query
+    prioridad: 4
+    limite_por_consulta: 20000

@@ -1,0 +1,27 @@
+# Regiones sísmicas aproximadas mediante cajas geográficas [lat_min, lat_max, lon_min, lon_max].
+# Se evalúan en orden: gana la primera región que contiene el epicentro.
+# Son una aproximación razonable para comparar regiones; pueden sustituirse por Flinn-Engdahl.
+
+regiones:
+  - nombre: Italia y entorno
+    cajas: [[36, 47.5, 6, 19]]
+  - nombre: Japón
+    cajas: [[30, 46, 128, 146]]
+  - nombre: Filipinas e Indonesia
+    cajas: [[-11, 20, 95, 140]]
+  - nombre: Grecia y Turquía
+    cajas: [[33, 43, 19, 45]]
+  - nombre: Himalaya y Asia central
+    cajas: [[25, 45, 60, 100]]
+  - nombre: Asia oriental
+    cajas: [[20, 55, 100, 150]]
+  - nombre: Oceanía y Melanesia
+    cajas: [[-50, 0, 110, 180], [-50, 0, -180, -170]]
+  - nombre: Américas (Pacífico y Andes)
+    cajas: [[-60, 72, -170, -65]]
+  - nombre: Europa
+    cajas: [[35, 72, -25, 45]]
+  - nombre: África y Oriente Medio
+    cajas: [[-40, 40, -20, 60]]
+  - nombre: Océanos y otras zonas
+    cajas: [[-90, 90, -180, 180]]
