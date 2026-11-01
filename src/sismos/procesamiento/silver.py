@@ -1,8 +1,10 @@
 """Capa silver: validación, limpieza, deduplicación, normalización, clasificación y cruce entre fuentes."""
 
 import logging
+import shutil
 from typing import Any
 
+from pyspark import StorageLevel
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
@@ -150,6 +152,13 @@ def clasificar(df: DataFrame) -> DataFrame:
     )
 
 
+def _materializar(df: DataFrame) -> DataFrame:
+    """Escribe el resultado en disco y corta el linaje; evita recalcular rondas anteriores y agotar memoria."""
+    persistido = df.persist(StorageLevel.DISK_ONLY)
+    persistido.count()
+    return persistido
+
+
 def _distancia_km(lat1: F.Column, lon1: F.Column, lat2: F.Column, lon2: F.Column) -> F.Column:
     dlat = F.radians(lat2 - lat1)
     dlon = F.radians(lon2 - lon1)
@@ -211,21 +220,23 @@ def cruzar_fuentes(df: DataFrame) -> DataFrame:
         .select("id_a", "id_b")
     )
     pares = pares.union(pares.select(F.col("id_b").alias("id_a"), F.col("id_a").alias("id_b")))
+    pares = _materializar(pares)
 
-    etiquetas = base.select(F.col("evento_id").alias("id"), F.col("evento_id").alias("etiqueta"))
+    etiquetas = _materializar(base.select(F.col("evento_id").alias("id"), F.col("evento_id").alias("etiqueta")))
     for _ in range(RONDAS_PROPAGACION):
         vecinos = (
             pares.join(etiquetas.select(F.col("id").alias("id_b"), F.col("etiqueta").alias("etiqueta_b")), "id_b")
             .groupBy("id_a")
             .agg(F.min("etiqueta_b").alias("minimo_vecino"))
         )
-        etiquetas = (
-            etiquetas.join(vecinos, etiquetas["id"] == vecinos["id_a"], "left")
-            .select(
+        anterior = etiquetas
+        etiquetas = _materializar(
+            etiquetas.join(vecinos, etiquetas["id"] == vecinos["id_a"], "left").select(
                 "id",
                 F.least(F.col("etiqueta"), F.coalesce(F.col("minimo_vecino"), F.col("etiqueta"))).alias("etiqueta"),
             )
         )
+        anterior.unpersist()
 
     agrupado = (
         df.join(etiquetas, df["evento_id"] == etiquetas["id"])
@@ -298,22 +309,34 @@ def ejecutar_silver() -> dict[str, int]:
     """Recalcula la capa silver completa desde bronze. Es determinista y reemplaza la salida anterior."""
     spark = crear_sesion("sismos-silver")
     bronze = spark.read.parquet(str(CONFIG.ruta_bronze))
-    mensajes = decodificar_bronze(bronze).cache()
+    mensajes = decodificar_bronze(bronze).persist(StorageLevel.MEMORY_AND_DISK)
+    total_mensajes = mensajes.count()
 
     resultado = construir_silver(mensajes)
-    silver = resultado["silver"].cache()
-    rechazados = resultado["rechazados"].cache()
+    total_normalizados = resultado["normalizados"].count()
+    total_sin_duplicados = resultado["sin_duplicados"].count()
+
+    rechazados = resultado["rechazados"]
+    rechazados.write.mode("overwrite").parquet(str(CONFIG.ruta_rechazados))
+
+    # Se escribe una sola vez y se cuenta desde disco: evita recalcular el cruce por cada métrica.
+    temporal = CONFIG.ruta_silver.parent / "silver_tmp"
+    if temporal.exists():
+        shutil.rmtree(temporal)
+    resultado["silver"].write.mode("overwrite").partitionBy("anio").parquet(str(temporal))
+    silver = spark.read.parquet(str(temporal))
+    total_silver = silver.count()
+    if CONFIG.ruta_silver.exists():
+        shutil.rmtree(CONFIG.ruta_silver)
+    temporal.rename(CONFIG.ruta_silver)
 
     metricas = {
-        "mensajes_bronze": mensajes.count(),
+        "mensajes_bronze": total_mensajes,
         "rechazados": rechazados.count(),
-        "duplicados_fuente": resultado["normalizados"].count() - resultado["sin_duplicados"].count(),
-        "fusionados_entre_fuentes": resultado["sin_duplicados"].count() - silver.count(),
-        "eventos_silver": silver.count(),
+        "duplicados_fuente": total_normalizados - total_sin_duplicados,
+        "fusionados_entre_fuentes": total_sin_duplicados - total_silver,
+        "eventos_silver": total_silver,
     }
-
-    rechazados.write.mode("overwrite").parquet(str(CONFIG.ruta_rechazados))
-    silver.write.mode("overwrite").partitionBy("anio").parquet(str(CONFIG.ruta_silver))
     log.info("Silver: %s", metricas)
     spark.stop()
     return metricas

@@ -20,7 +20,7 @@ def crear_sesion(nombre: str, con_kafka: bool = False) -> SparkSession:
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.ansi.enabled", "false")
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")
-        .config("spark.sql.shuffle.partitions", os.getenv("SISMOS_SHUFFLE_PARTITIONS", "8"))
+        .config("spark.sql.shuffle.partitions", os.getenv("SISMOS_SHUFFLE_PARTITIONS", "64"))
         .config("spark.sql.parquet.compression.codec", "snappy")
     )
     if con_kafka:
