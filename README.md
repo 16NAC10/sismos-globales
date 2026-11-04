@@ -119,26 +119,6 @@ Pestañas: Resumen, Mapas (epicentros y mapa de calor), Evolución temporal, Reg
 
 Filtros: fecha, magnitud, profundidad, región y fuente de datos. Un evento fusionado aparece al seleccionar cualquiera de sus fuentes.
 
-## Cambios respecto al enunciado
-
-| Enunciado | Decisión | Motivo |
-|---|---|---|
-| HDFS como almacenamiento masivo | Parquet en un data lake local (`data/lake`) | El volumen de catálogo sísmico (millones de filas, no petabytes) no justifica un clúster HDFS. El formato Parquet y la organización bronze/silver/gold se mantienen, y la ruta puede moverse a HDFS o S3 sin cambiar el código de transformación. |
-| Power BI | Panel en Streamlit con Plotly y pydeck | Power BI no se conecta de forma nativa a MongoDB, y su versión Pro limita los modelos a 1 GB. Streamlit consulta MongoDB directamente, cubre todos los gráficos pedidos (mapa, mapa de calor, líneas, barras, dispersión) y se despliega en Docker. |
-| Kafka | Se mantiene | Desacopla la ingesta del procesamiento. El topic conserva los mensajes (`KAFKA_LOG_RETENTION_MS=-1`) para poder reprocesar bronze. |
-| Spark / PySpark | Se mantiene | Structured Streaming con `availableNow` para procesar solo lo nuevo; batch para silver y gold. |
-| MongoDB | Se mantiene | Almacena eventos procesados y agregados para consultas rápidas. |
-| Fuentes | USGS, EMSC, GFZ e INGV | Todas exponen el servicio FDSN Event, así que se usa un único cliente. USGS usa GeoJSON para obtener nivel de alerta, tsunami y significancia. |
-| Solo ventana de 30 años | Configurable (`anios_historico`) | Se puede ampliar sin cambios de código. |
-
-Cambios adicionales que no estaban en el enunciado:
-
-- **Cruce entre fuentes**: el mismo sismo aparece en varias agencias con identificadores distintos. Sin este paso, los conteos y la distribución quedarían inflados.
-- **Rechazados auditables**: los registros descartados se guardan con el motivo.
-- **Checkpoints**: la ingesta incremental solo avanza el checkpoint después de confirmar el envío a Kafka, para no perder eventos.
-- **Carga en MongoDB sin estados parciales**: se escribe en una colección temporal y se renombra al final.
-- **Solapamiento de 48 h** en la ingesta incremental para captar revisiones de magnitud o localización.
-
 ## Limitaciones conocidas
 
 - **Regiones aproximadas**: se asignan con cajas geográficas. Para un análisis oficial conviene usar Flinn-Engdahl o polígonos de países.
